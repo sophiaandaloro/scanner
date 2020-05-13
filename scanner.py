@@ -259,13 +259,13 @@ def work(run_id,
         st = straxen.context.xenon1t_dali(output_folder=output_folder)
         st.set_config(**config)
         st.register(register)
-        st.make(run_id, target, max_worker=kwargs.get('n_cpu', 40), **kwargs)
+        st.make(run_id, target, max_worker=kwargs.get('n_cpu', 4), **kwargs)
     else:
         st = straxen.contexts.xenonnt_online(register=register,
                                              output_folder=output_folder,
                                              config=config
                                             )
-        st.make(run_id, target, max_worker=kwargs.get('n_cpu', 40), **kwargs)
+        st.make(run_id, target, max_worker=kwargs.get('n_cpu', 4), **kwargs)
     
     
 
