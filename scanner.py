@@ -345,7 +345,7 @@ if __name__ == "__main__": #happens if submit_setting() is called
              xenon1t=eval(xenon1t)
             )
         time1 = time.perf_counter()
-        print('Job took: %.2gs'%(time1-time0))
+        print('Job took: %.2fs'%(time1-time0))
         # TODO: Clean up everything except for the log file?
     else:
         raise ValueError("Bad command line arguments")
