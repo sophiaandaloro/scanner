@@ -6,6 +6,7 @@ import random
 import shutil
 import subprocess
 import sys
+import inspect
 import tempfile
 import time
 from collections import OrderedDict
@@ -34,7 +35,7 @@ JOB_HEADER = """#!/bin/bash
 . "{conda_dir}/etc/profile.d/conda.sh"
 {conda_dir}/bin/conda activate {env_name}
 echo Starting scanner
-python {python_file} {run_id} {data_path} {config_file} 
+python {python_file} {run_id} {target} {data_path} {config_file} {xenon1t}
 """
 
 
@@ -64,10 +65,10 @@ def scan_parameters(target,
         - kwargs: max_hours, extra_header, n_cpu, ram (typical dali job 
             sumission arguments apply.)
     """
-    assert 'run_id' in parameter.keys(), 'No run_id key found in parameters.' 
     # List of todos, or things we could change as well:
-    #TODO: this function does not support a chnage of context yet. 
-    #        * But should be possible to make it an argument.
+    #TODO: this function does not support a change of the context. Is this needed?
+    
+    assert 'run_id' in parameter.keys(), 'No run_id key found in parameters.' 
     config_list = _make_config(parameter)
     
     # I guess it will happen from time to time that somebody messes up....
@@ -79,37 +80,56 @@ def scan_parameters(target,
     default_job_config = {'job_name': name,
                           'n_cpu': 4,
                           'max_hours': 8,
-                          'mem-per-cpu': 4480,
+                          'mem-per-cpu': 8000,
                           'partition': 'dali',
                           'conda_dir': '/dali/lgrandi/strax/miniconda3',
-                          'extra_sbatch_header': ''
+                          'env_name': 'strax',
+                          'extra_header': ''
                          }
     # Update default settings:
     if job_config:
         for key, value in job_config.items():
             if key in default_job_config.keys():
-                default_job_config['key'] = value
+                default_job_config[key] = value
             else:
-                raise ValueError(f'Job settings {key} is not supported.')
+                raise ValueError(f'Job settings {key} is not supported. If you\n' 
+                                 'want to add some SBATCH option please use the\n'
+                                 '"extra_sbatch_header" key.')
     
     # Lets print the settings and ask the user again:
     print('\nYou specified the following settings for the batch jobs:')
     for key, value in default_job_config.items():
         print(f'{key}:   {value}')
     _user_check()
-    return 0
     
+    # Now we have to make sure that the batch node will know where to 
+    # find our newly registered plugins.
+   
+    if register:
+        if not isinstance(register, (list, tuple)):
+            register = [register]
     
+        # Creating a dictionary with all relevant information about the 
+        # plugin.
+        reg = []
+        for p in register:
+            directory = os.path.dirname(inspect.getfile(p)) 
+            reg.append({'mod_path': directory,
+                        'mod': p.__module__,
+                        'p_name': p.__name__}) 
+        register=reg
+
     # Check that directory exists, else make it
     if not os.path.exists(log_directory):
         os.makedirs(log_directory)
-
     # Submit each of these, such that it calls me (parameter_scan.py) with submit_setting option
     for i, config in enumerate(config_list):
         print('Submitting %d with %s' % (i, config))
-        submit_setting(target,
+        # Now we add this to our config and later to the json file.
+        config['register'] = register
+        submit_setting(config.pop('run_id'),
+                       target,
                        name,
-                       register,
                        config,
                        output_directory,
                        default_job_config,
@@ -162,10 +182,9 @@ def _make_config(parameters_dict):
     return strax_options
 
 
-def submit_setting(run_id, # do we need this line? Don't think it should be in here. 
+def submit_setting(run_id,
                    target,
                    name,
-                   register,
                    config,
                    output_directory,
                    job_config,
@@ -211,14 +230,20 @@ def submit_setting(run_id, # do we need this line? Don't think it should be in h
         - env_name: Which conda env do you want, defaults to strax 
             inside conda_dir
     """
-    
     job_fn = tempfile.NamedTemporaryFile(delete=False,
                                          dir=log_directory).name
+    job_fn += '_job'
+    
     log_fn = tempfile.NamedTemporaryFile(delete=False,
                                          dir=log_directory).name
-
+    log_fn += '_log'
     config_fn = tempfile.NamedTemporaryFile(delete=False,
                                             dir=log_directory).name
+    config_fn += '_conf'
+    
+    
+    # Lets add the job_config here, so we can later read it in again:
+    config['job_config'] = job_config
     
     #Takes configuration parameters and dumps the stringed version into a file called config_fn
     with open(config_fn, mode='w') as f:
@@ -233,11 +258,12 @@ def submit_setting(run_id, # do we need this line? Don't think it should be in h
             python_file=os.path.abspath(__file__),
             config_file = config_fn,
             name=name,
-            run_id=config['run_id'],
-            data_path=output_directory, 
+            run_id=run_id,
+            target=target,
+            data_path=output_directory,
+            xenon1t=xenon1t
         ))
-    print(sys.argv)
-
+    #print(sys.argv)  # Can we remove this print out? - Daniel
     print("\tSubmitting sbatch %s" % job_fn)
     result = subprocess.check_output(['sbatch', job_fn])
 
@@ -247,25 +273,45 @@ def submit_setting(run_id, # do we need this line? Don't think it should be in h
     print("\tYou have job id %d" % job_id)
 
 
-def work(run_id, 
+def work(run_id,
          target,  
          config, 
+         job_config,
          output_folder='./strax_data',
          register=None, 
          xenon1t=False,
          **kwargs):
-    if xenon1T:
-        # XENON1T env is not as flexiable as the nT env...
-        st = straxen.context.xenon1t_dali(output_folder=output_folder)
-        st.set_config(**config)
-        st.register(register)
-        st.make(run_id, target, max_worker=kwargs.get('n_cpu', 4), **kwargs)
-    else:
+    
+    if register:
+        # First we have to in case there are any plugins to register:
+        if not isinstance(register, (list, tuple)): 
+            register = [register]
+        
+        reg = []
+        for p in register:
+            if not 'straxen.plugins.' in p['mod_path']:
+                # Not part of straxen so add path:
+                sys.path.append(p['mod_path'])
+            # Now get plugin:
+            mod = __import__(p['mod'], fromlist=p['p_name'])
+            p = getattr(mod, p['p_name'])
+            reg.append(p)
+        register = reg
+    
+    if xenon1t:
+        st = straxen.contexts.xenon1t_dali(
+                                           output_folder=output_folder,
+                                          )
+        if register is not None:
+            st.register(register)
+
+    else:            
         st = straxen.contexts.xenonnt_online(register=register,
                                              output_folder=output_folder,
-                                             config=config
                                             )
-        st.make(run_id, target, max_worker=kwargs.get('n_cpu', 4), **kwargs)
+
+    st.set_config(config)
+    st.make(run_id, target, max_workers=job_config['n_cpu'], **kwargs)
     
     
 
@@ -273,21 +319,33 @@ if __name__ == "__main__": #happens if submit_setting() is called
     if len(sys.argv) == 1: # argv[0] is the filename
         print('hi I am ', __file__)
         scan_parameters()
-    elif len(sys.argv) == 5:
+    elif len(sys.argv) == 6:
         run_id = sys.argv[1]
         target = sys.argv[2]
-        config_fn = sys.argv[3]
-        output_folder = sys.argv[4]
+        data_path = sys.argv[3]
+        config_fn = sys.argv[4]
+        xenon1t = sys.argv[5]
         print(run_id, data_path, config_fn)
         print("Things are changing")
         # Reread the config file to grab the config parameters
         with open(config_fn, mode='r') as f:
-            config = json.load(f)
+            config = json.load(f)  
+        
+        # Now we have to seperate off all
+        # non-strax configs:
+        register=config.pop('register')
+        job_config=config.pop('job_config')
+        time0 = time.perf_counter()
         work(run_id=run_id, 
              target=target, 
-             register=config['register'], 
+             register=register, 
              output_folder=data_path, 
-             config=config)
-        
+             config=config,
+             job_config=job_config,
+             xenon1t=eval(xenon1t)
+            )
+        time1 = time.perf_counter()
+        print('Job took: %.2gs'%(time1-time0))
+        # TODO: Clean up everything except for the log file?
     else:
         raise ValueError("Bad command line arguments")
