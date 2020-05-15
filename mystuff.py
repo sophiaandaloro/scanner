@@ -5,17 +5,19 @@ import straxen
 ### EDIT BELOW TO CHANGE CONFIG SETTINGS ###
 # In case you want to register any non-standard plugins which is not part of the offical straxen 
 # you have to specify the path where the .py file with the plugin can be found:
-sys.path.append('/home/dwenz/python_scripts/XENONnT/analysiscode/PMTs/HitFinder/Threshold')
+sys.path.append('/path/to/plugin')
 # and import it.
 from HitFinderThresholdPlugin import HitIntegratingAnalysis
 
-
-# TODO: Change these parameters back to some default example...
+# Target to acquire with strax (should be a data kind)
 target = 'hitfinder_hits'
-name = 'hf' # TODO: I think Sophia mentioned a max number of characters. 
-output_directory = './strax_data'
-register=[HitIntegratingAnalysis] # Plugins to be registered, can be None, single Plugin or a list of Plugins.
+# Plugins to be registered, can be None, single Plugin or a list of Plugins.
+register=[HitIntegratingAnalysis] 
 
+# Add your initials so your scanner jobs can be found/uniquely ID'd 
+# m(keep characters <5 to not get thrown to resources queue)
+name = 'hf' 
+output_directory = './strax_data' #where the new processed data will be saved.
 
 # Here are some notes how you have to specifiy the parameter settings:
 # 1.) The key word in the following dict must be equivalent to the key
@@ -34,6 +36,11 @@ paramter_dict = {'run_id': ['007447', '007455'], # can also be a list of run_ids
                  'save_outside_hits_right': [100, 120]}
 
 #scan over everything in strax_options
+#Options here: 
+# n_cpu: How many CPUs per each setting to request. Try to limit number
+# max_hours: Job will automatically cancel if max is reached. 
+#            Otherwise job will finish once the function scan_parameters is complete.
+# Partition: xenon1t, dali, are good options.
 scanner.scan_parameters(target,
                         paramter_dict,
                         register=register,
@@ -42,5 +49,5 @@ scanner.scan_parameters(target,
                         job_config={'n_cpu': 2, 
                                     'max_hours': 1,
                                    'partition': 'xenon1t'},
-                        xenon1t=False
+                        xenon1t=False #Specify True if working with 1t data 
                        )
