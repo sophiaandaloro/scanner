@@ -2,8 +2,6 @@ print('Please stand-by submission is initalized, this may take a moment.\n')
 import json
 import logging
 import os
-import random 
-import shutil
 import subprocess
 import sys
 import inspect
