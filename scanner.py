@@ -24,6 +24,7 @@ JOB_HEADER = """#!/bin/bash
 #SBATCH --job-name=scan_{name}
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={n_cpu}
+#SBATCH --mem-per-cpu={mem-per-cpu}
 #SBATCH --time={max_hours}:00:00
 #SBATCH --partition={partition}
 #SBATCH --account=pi-lgrandi
@@ -67,8 +68,9 @@ def scan_parameters(target,
     """
     # List of todos, or things we could change as well:
     #TODO: this function does not support a change of the context. Is this needed?
-    
     assert 'run_id' in parameter.keys(), 'No run_id key found in parameters.' 
+    
+    # Let us first make all possible parameter combinations:
     config_list = _make_config(parameter)
     
     # I guess it will happen from time to time that somebody messes up....
@@ -106,7 +108,7 @@ def scan_parameters(target,
     # find our newly registered plugins.
    
     if register:
-        if not isinstance(register, (list, tuple)):
+        if not isinstance(register, list):
             register = [register]
     
         # Creating a dictionary with all relevant information about the 
@@ -159,25 +161,42 @@ def _make_config(parameters_dict):
     # friendly.    
     parameters = OrderedDict()
     for key, values in parameters_dict.items():
-        print(key, values)
         parameters[key] = values
 
     keys = list(parameters.keys())
     values = list(parameters.values())
-
     #Make a meshgrid of all the possible parameters we have, for scanning purposes.
-    combination_values = np.array(np.meshgrid(*values)).T.reshape(-1,
-                                                                  len(parameters))
-
+    # Notes:
+    # 1.) run_id is a string hence everything will be converted into strings
+    # 2.) We have to interpret tuples and list differently here. List should be 
+    #     all objects we would like to iterate, while tuples should stay as a single
+    #     setting together (e.g. if you want to specifiy a window as (left_sample, right_sample))
+    # 3.) To realize 2.) we exploit 1.) and convert already before hand every
+    #     tuple into strings. In this way they wont be split by meshgrid.
+    # First store original types:
+    value_types = [type(v[0]) if isinstance(v, list) else type(v)  for v in values]
+    # Now convert all tuple to strings:
+    for ind, v in enumerate(values):
+        if isinstance(v, tuple):
+            values[ind] = str(v)
+        elif isinstance(v, list) and isinstance(v[0], tuple):
+            values[ind] = [str(subv) for subv in v]
+    print(values)
+    combination_values = np.array(np.meshgrid(*values)).T.reshape(-1, len(parameters))
+    
     strax_options = []
-
     #Enumerate over all possible options to create a strax_options list for scanning later.
     for i, value in enumerate(combination_values):
         print('Setting %d:' % i)
         config = {}
-        for j, parameter in enumerate(value):
+        for j, (parameter, vtype) in enumerate(zip(value, value_types)):
             print('\t', keys[j], parameter)
-            config[keys[j]] = parameter
+            if vtype == tuple:
+                config[keys[j]] = eval(parameter)  
+            else:
+                # eval does not work for strings
+                config[keys[j]] = vtype(parameter) 
+                
         strax_options.append(config)
     return strax_options
 
@@ -231,15 +250,14 @@ def submit_setting(run_id,
             inside conda_dir
     """
     job_fn = tempfile.NamedTemporaryFile(delete=False,
-                                         dir=log_directory).name
-    job_fn += '_job'
-    
+                                         dir=log_directory,
+                                        suffix='_job').name
     log_fn = tempfile.NamedTemporaryFile(delete=False,
-                                         dir=log_directory).name
-    log_fn += '_log'
+                                         dir=log_directory,
+                                        suffix= '_log').name
     config_fn = tempfile.NamedTemporaryFile(delete=False,
-                                            dir=log_directory).name
-    config_fn += '_conf'
+                                            dir=log_directory,
+                                           suffix='_conf').name
     
     
     # Lets add the job_config here, so we can later read it in again:
@@ -281,7 +299,6 @@ def work(run_id,
          register=None, 
          xenon1t=False,
          **kwargs):
-    
     if register:
         # First we have to in case there are any plugins to register:
         if not isinstance(register, (list, tuple)): 
@@ -299,18 +316,14 @@ def work(run_id,
         register = reg
     
     if xenon1t:
-        st = straxen.contexts.xenon1t_dali(
-                                           output_folder=output_folder,
-                                          )
-        if register is not None:
-            st.register(register)
-
-    else:            
-        st = straxen.contexts.xenonnt_online(register=register,
-                                             output_folder=output_folder,
-                                            )
-
-    st.set_config(config)
+        sys.stdout.write('xenon1t')
+        st = straxen.contexts.xenon1t_dali(output_folder=output_folder)
+    else:        
+        sys.stdout.write('xenonnt')
+        st = straxen.contexts.xenonnt_online(output_folder=output_folder)
+    
+    st.register(register)
+    st.set_config(config)    
     st.make(run_id, target, max_workers=job_config['n_cpu'], **kwargs)
     
     
@@ -325,8 +338,7 @@ if __name__ == "__main__": #happens if submit_setting() is called
         data_path = sys.argv[3]
         config_fn = sys.argv[4]
         xenon1t = sys.argv[5]
-        print(run_id, data_path, config_fn)
-        print("Things are changing")
+        print("\n Things are changing \n")
         # Reread the config file to grab the config parameters
         with open(config_fn, mode='r') as f:
             config = json.load(f)  
@@ -335,7 +347,6 @@ if __name__ == "__main__": #happens if submit_setting() is called
         # non-strax configs:
         register=config.pop('register')
         job_config=config.pop('job_config')
-        time0 = time.perf_counter()
         work(run_id=run_id, 
              target=target, 
              register=register, 
@@ -344,8 +355,6 @@ if __name__ == "__main__": #happens if submit_setting() is called
              job_config=job_config,
              xenon1t=eval(xenon1t)
             )
-        time1 = time.perf_counter()
-        print('Job took: %.2fs'%(time1-time0))
         # TODO: Clean up everything except for the log file?
     else:
         raise ValueError("Bad command line arguments")
