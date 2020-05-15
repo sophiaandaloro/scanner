@@ -68,8 +68,9 @@ def scan_parameters(target,
     """
     # List of todos, or things we could change as well:
     #TODO: this function does not support a change of the context. Is this needed?
-    
     assert 'run_id' in parameter.keys(), 'No run_id key found in parameters.' 
+    
+    # Let us first make all possible parameter combinations:
     config_list = _make_config(parameter)
     
     # I guess it will happen from time to time that somebody messes up....
@@ -107,7 +108,7 @@ def scan_parameters(target,
     # find our newly registered plugins.
    
     if register:
-        if not isinstance(register, (list, tuple)):
+        if not isinstance(register, list):
             register = [register]
     
         # Creating a dictionary with all relevant information about the 
@@ -164,8 +165,23 @@ def _make_config(parameters_dict):
 
     keys = list(parameters.keys())
     values = list(parameters.values())
-    value_types = [type(v[0]) if isinstance(v, (list, tuple)) else type(v)  for v in parameters.values()]
     #Make a meshgrid of all the possible parameters we have, for scanning purposes.
+    # Notes:
+    # 1.) run_id is a string hence everything will be converted into strings
+    # 2.) We have to interpret tuples and list differently here. List should be 
+    #     all objects we would like to iterate, while tuples should stay as a single
+    #     setting together (e.g. if you want to specifiy a window as (left_sample, right_sample))
+    # 3.) To realize 2.) we exploit 1.) and convert already before hand every
+    #     tuple into strings. In this way they wont be split by meshgrid.
+    # First store original types:
+    value_types = [type(v[0]) if isinstance(v, list) else type(v)  for v in values]
+    # Now convert all tuple to strings:
+    for ind, v in enumerate(values):
+        if isinstance(v, tuple):
+            values[ind] = str(v)
+        elif isinstance(v, list) and isinstance(v[0], tuple):
+            values[ind] = [str(subv) for subv in v]
+    print(values)
     combination_values = np.array(np.meshgrid(*values)).T.reshape(-1, len(parameters))
     
     strax_options = []
@@ -173,9 +189,14 @@ def _make_config(parameters_dict):
     for i, value in enumerate(combination_values):
         print('Setting %d:' % i)
         config = {}
-        for j, (parameter,vtype) in enumerate(zip(value, value_types)):
+        for j, (parameter, vtype) in enumerate(zip(value, value_types)):
             print('\t', keys[j], parameter)
-            config[keys[j]] = vtype(parameter)
+            if vtype == tuple:
+                config[keys[j]] = eval(parameter)  
+            else:
+                # eval does not work for strings
+                config[keys[j]] = vtype(parameter) 
+                
         strax_options.append(config)
     return strax_options
 
