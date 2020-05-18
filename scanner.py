@@ -71,7 +71,7 @@ def scan_parameters(target,
     assert 'run_id' in parameter.keys(), 'No run_id key found in parameters.' 
     
     # Let us first make all possible parameter combinations:
-    config_list = _make_config(parameter)
+    config_list = make_config(parameter)
     
     # I guess it will happen from time to time that somebody messes up....
     # So let us people explicitly confirm their submission before they start
@@ -156,7 +156,7 @@ def _user_check():
             answer = input(f'{answer} was not a valid input please use (y/n) for yes/no.')
     
 
-def _make_config(parameters_dict):
+def make_config(parameters_dict, be_quiet = False):
     # Converting any dict to ordered dict, might be a bit more user 
     # friendly.    
     parameters = OrderedDict()
@@ -181,16 +181,17 @@ def _make_config(parameters_dict):
             values[ind] = str(v)
         elif isinstance(v, list) and isinstance(v[0], tuple):
             values[ind] = [str(subv) for subv in v]
-    print(values)
     combination_values = np.array(np.meshgrid(*values)).T.reshape(-1, len(parameters))
     
     strax_options = []
     #Enumerate over all possible options to create a strax_options list for scanning later.
     for i, value in enumerate(combination_values):
-        print('Setting %d:' % i)
+        if not be_quiet:
+            print('Setting %d:' % i)
         config = {}
         for j, (parameter, vtype) in enumerate(zip(value, value_types)):
-            print('\t', keys[j], parameter)
+            if not be_quiet:
+                print('\t', keys[j], parameter)
             if vtype == tuple:
                 config[keys[j]] = eval(parameter)  
             else:
