@@ -10,7 +10,6 @@ import tempfile
 import time
 from collections import OrderedDict
 
-
 import numpy as np
 
 import straxen
@@ -126,7 +125,8 @@ def scan_parameters(target,
         print('Submitting %d with %s' % (i, config))
         # Now we add this to our config and later to the json file.
         config['register'] = register
-        submit_setting(config.pop('run_id'),
+        submit_setting(i,
+                       config.pop('run_id'),
                        target,
                        name,
                        config,
@@ -180,7 +180,8 @@ def _make_config(parameters_dict):
     return strax_options
 
 
-def submit_setting(run_id,
+def submit_setting(setting_number,
+                   run_id,
                    target,
                    name,
                    config,
@@ -227,21 +228,16 @@ def submit_setting(run_id,
             Change?
         - env_name: Which conda env do you want, defaults to strax 
             inside conda_dir
-    """
-    job_fn = tempfile.NamedTemporaryFile(delete=False,
-                                         dir=log_directory).name
-    job_fn += '_job'
+    """ 
+    file_fn = log_directory + '/setting_' + str(setting_number) + "_" + tempfile.NamedTemporaryFile(delete=True, dir=log_directory).name[-5:] #so if you submit many identical jobs you don't write over old ones
     
-    log_fn = tempfile.NamedTemporaryFile(delete=False,
-                                         dir=log_directory).name
-    log_fn += '_log'
-    config_fn = tempfile.NamedTemporaryFile(delete=False,
-                                            dir=log_directory).name
-    config_fn += '_conf'
-    
+    job_fn = file_fn + '_job'  
+    log_fn = file_fn + '_log'
+    config_fn = file_fn + '_conf'
     
     # Lets add the job_config here, so we can later read it in again:
     config['job_config'] = job_config
+    config['setting_number'] = setting_number
     
     #Takes configuration parameters and dumps the stringed version into a file called config_fn
     with open(config_fn, mode='w') as f:
@@ -261,11 +257,10 @@ def submit_setting(run_id,
             data_path=output_directory,
             xenon1t=xenon1t
         ))
-    #print(sys.argv)  # Can we remove this print out? - Daniel
+
     print("\tSubmitting sbatch %s" % job_fn)
     result = subprocess.check_output(['sbatch', job_fn])
 
-    print("\tsbatch returned: %s" % result)
     job_id = int(result.decode().split()[-1])
 
     print("\tYou have job id %d" % job_id)
