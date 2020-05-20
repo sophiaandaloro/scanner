@@ -126,3 +126,10 @@ submit_setting then finally writes out a job header to submit to the batch queue
 
 With the job submitted, and scanner.py called directly in the job submission, we turn to the final part of this process. We run work, which simply registers the straxen context you need (depending on the data you are using) and calls st.make(target) to make your target data in your target directory.
 The job closes out, writing the time of the job to your _log file, if you care to see how long it's taking. This can be helpful for debugging.
+
+## Version & Release Notes
+### v0.2.0 (Current)
+Features: 
+1. Now functional with both XENONnT and XENON1T data, via argument specification.
+2. You can now pass your own plugins as configuration options. Simply import your plugin(s) and append to a plugin list. 
+3. Several quality of life changes. You can double-check your strax settings before submitting your jobs via a command-line prompt. Log files are now easily traceable, and include more information about your jobs. Better documentation = happier analysts!
