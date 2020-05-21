@@ -11,9 +11,9 @@ from HitFinderThresholdPlugin import HitIntegratingAnalysis
 
 
 # TODO: Change these parameters back to some default example...
-target = 'hitfinder_hits'
+target = 'hitfinder_area_per_record'
 name = 'hf' # TODO: I think Sophia mentioned a max number of characters. 
-output_directory = './strax_data'
+output_directory = '/dali/lgrandi/wenz/strax_data/HitFinder/nT'
 register=[HitIntegratingAnalysis] # Plugins to be registered, can be None, single Plugin or a list of Plugins.
 
 
@@ -28,10 +28,10 @@ register=[HitIntegratingAnalysis] # Plugins to be registered, can be None, singl
 #     like "search_window": (110, 140) or e.g. a left and right hit extension. You can 
 #     also iterate over tuple-settings when specified as a list. E.g. if you want to 
 #     check multiple search windows you can do "search_window": [(110, 140), (128, 150), (134, 170)]
-paramter_dict = {'run_id': ['007447', '007455'], # can also be a list of run_ids, to apply our scan to multiple runs.
-                 'threshold': 15,
-                 'save_outside_hits_left': 20,
-                 'save_outside_hits_right': [100, 120]}
+paramter_dict = {'run_id': '007447', # can also be a list of run_ids, to apply our scan to multiple runs.
+                 'threshold': [8, 10, 15, 20, 25],
+                 'save_outside_hits_left': [20, 30, 40],
+                 'save_outside_hits_right': [140, 160, 180, 200, 220, 240, 260, 280]}
 
 #scan over everything in strax_options
 scanner.scan_parameters(target,
@@ -40,7 +40,7 @@ scanner.scan_parameters(target,
                         output_directory=output_directory,
                         name=f'{name}_scan',
                         job_config={'n_cpu': 2, 
-                                    'max_hours': 1,
+                                    'max_hours': 2,
                                    'partition': 'xenon1t'},
                         xenon1t=False
                        )
