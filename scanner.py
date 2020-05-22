@@ -69,6 +69,12 @@ def scan_parameters(target,
     
 
     assert 'run_id' in parameter.keys(), 'No run_id key found in parameters.' 
+    
+    print('WARNING: Please make sure that the subsquent settings do not change\n',
+          'the byte size of data_types when using different parameter settings.\n', 
+          'E.g. they do not change the data length of records or equivalent.\n',
+          'This may break your cached numba functions!\n'
+         )
     config_list = make_config(parameter)
     
     # I guess it will happen from time to time that somebody messes up....
