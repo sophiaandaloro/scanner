@@ -339,6 +339,11 @@ if __name__ == "__main__": #happens if submit_setting() is called
         register=config.pop('register')
         job_config=config.pop('job_config')
         time0 = time.perf_counter()
+        
+        # Add random sleep to avoid numba cache errors...
+        t = np.random.uniform(0,1)
+        time.sleep(1+t)
+        
         work(run_id=run_id, 
              target=target, 
              register=register, 
