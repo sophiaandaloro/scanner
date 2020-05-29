@@ -8,17 +8,16 @@ import straxen
 # you have to specify the path where the .py file with the plugin can be found:
 # sys.path.append('/path/to/plugin')
 # and import it.
-# from HitFinderThresholdPlugin import HitIntegratingAnalysis
-from led_calibration import LEDCalibration
-# Target to acquire with strax (should be a data kind)
-target = 'led_calibration'# 'hitfinder_hits'
-# Plugins to be registered, can be None, single Plugin or a list of Plugins.
-register=[LEDCalibration]
-# register=None
-# Add your initials so your scanner jobs can be found/uniquely ID'd 
-# (keep characters <5 to not get thrown to resources queue)
-name = 'sja' 
-output_directory = './strax_data' #where the new processed data will be saved.
+sys.path.append('/home/dwenz/python_scripts/XENONnT/analysiscode/PMTs/HitFinder/Threshold')
+from HitFinderThresholdPlugin import HitIntegratingAnalysis
+
+
+# TODO: Change these parameters back to some default example...
+target = 'hitfinder_area_per_record'
+name = 'hf' # TODO: I think Sophia mentioned a max number of characters. 
+output_directory = '/dali/lgrandi/wenz/strax_data/HitFinder/nT'
+register=[HitIntegratingAnalysis] # Plugins to be registered, can be None, single Plugin or a list of Plugins.
+
 
 # Here are some notes how you have to specifiy the parameter settings:
 # 1.) The key word in the following dict must be equivalent to the key
@@ -30,11 +29,11 @@ output_directory = './strax_data' #where the new processed data will be saved.
 #     we indicate settings which should not be terated e.g. if you have a setting
 #     like "search_window":  and right hit e(110, 140) or e.g. a leftxtension. You can 
 #     also iterate over tuple-settings when specified as a list. E.g. if you want to 
-#     check multiple search windows yoseu can do "arch_window": [(110, 140), (128, 150), (134, 170)]
-paramter_dict = {'run_id': ['007447'], # List of run_ids to apply scan to
-                 'baseline_window': [(0,30), (0,40)], #An example of a tuple-style setting
-                 'save_outside_hits_left': [20], #An example of a single-valued setting
-                }
+#     check multiple search windows you can do "search_window": [(110, 140), (128, 150), (134, 170)]
+paramter_dict = {'run_id': ['007447'], # can also be a list of run_ids, to apply our scan to multiple runs.
+                 'threshold': [8, 10, 15, 20, 25],
+                 'save_outside_hits_left': [30],
+                 'save_outside_hits_right': [140]}
 
 #scan over everything in strax_options
 #Options here: 

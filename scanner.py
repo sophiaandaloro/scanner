@@ -25,6 +25,7 @@ JOB_HEADER = """#!/bin/bash
 #SBATCH --time={max_hours}:00:00
 #SBATCH --partition={partition}
 #SBATCH --account=pi-lgrandi
+#SBATCH --mem-per-cpu={mem-per-cpu}
 #SBATCH --qos={partition}
 #SBATCH --output={log_fn}
 #SBATCH --error={log_fn}
@@ -66,8 +67,16 @@ def scan_parameters(target,
     # List of todos, or things we could change as well:
     #TODO: this function does not support a change of the context. Is this needed?
     
+
     assert 'run_id' in parameter.keys(), 'No run_id key found in parameters.' 
-    config_list = _make_config(parameter)
+    
+    config_list = make_config(parameter)
+    
+    print('WARNING: Please make sure that the subsquent settings do not change\n',
+      'the byte size of data_types when using different parameter settings.\n', 
+      'E.g. they do not change the data length of records or equivalent.\n',
+      'This may break your cached numba functions!\n'
+     )
     
     # I guess it will happen from time to time that somebody messes up....
     # So let us people explicitly confirm their submission before they start
@@ -153,7 +162,7 @@ def _user_check():
             answer = input(f'{answer} was not a valid input please use (y/n) for yes/no.')
     
 
-def _make_config(parameters_dict):
+def make_config(parameters_dict, be_quiet = False):
     # Converting any dict to ordered dict, might be a bit more user 
     # friendly.    
     parameters = OrderedDict()
@@ -171,7 +180,8 @@ def _make_config(parameters_dict):
 
     #Enumerate over all possible options to create a strax_options list for scanning later.
     for i, value in enumerate(combination_values):
-        print('Setting %d:' % i)
+        if not be_quiet:
+            print('Setting %d:' % i)
         config = {}
         for j, parameter in enumerate(value):
             print('\t', keys[j], parameter)
@@ -329,6 +339,11 @@ if __name__ == "__main__": #happens if submit_setting() is called
         register=config.pop('register')
         job_config=config.pop('job_config')
         time0 = time.perf_counter()
+        
+        # Add random sleep to avoid numba cache errors...
+        t = np.random.uniform(0,1)
+        time.sleep(1+t)
+        
         work(run_id=run_id, 
              target=target, 
              register=register, 
