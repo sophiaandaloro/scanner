@@ -305,14 +305,15 @@ def work(run_id,
         st = straxen.contexts.xenon1t_dali(
                                            output_folder=output_folder,
                                           )
-        if register is not None:
-            st.register(register)
 
     else:            
         st = straxen.contexts.xenonnt_online(register=register,
                                              output_folder=output_folder,
                                             )
 
+    if register is not None:
+        st.register(register)
+    
     st.set_config(config)
     st.make(run_id, target, max_workers=job_config['n_cpu'], **kwargs)
     
