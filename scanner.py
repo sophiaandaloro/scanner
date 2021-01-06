@@ -307,7 +307,7 @@ def work(run_id,
                                           )
 
     else:            
-        st = straxen.contexts.xenonnt_online(register=register,
+        st = straxen.contexts.xenonnt_online(
                                              output_folder=output_folder,
                                             )
 
